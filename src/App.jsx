@@ -1,13 +1,14 @@
+import AttendanceDashboard from './components/AttendanceDashboard';
 import { useState } from 'react';
 import Login from './components/Login';
 import AddEmploye from './components/AddEmploye';
 import EmployeList from './components/EmployeList';
+import DepartementList from './components/DepartementList';
 
 function App() {
     const [token, setToken] = useState(null);
     const [refreshList, setRefreshList] = useState(false);
     const [activeTab, setActiveTab] = useState('add');
-
     const handleLoginSuccess = (t) => setToken(t);
     const handleLogout = () => setToken(null);
     const handleEmployeAdded = () => {
@@ -50,7 +51,33 @@ function App() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 mb-8">
+                {/* La div a été modifiée pour inclure tous les boutons */}
+                <div className="flex flex-wrap gap-2 mb-8">
+                    
+                    <button onClick={() => setActiveTab('departements')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 font-bold text-xs uppercase tracking-widest transition-all
+                            ${activeTab === 'departements'
+                                ? 'bg-black text-white border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)]'
+                                : 'bg-white text-black border-black hover:bg-gray-100'
+                            }`}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Départements
+                    </button>
+                    <button onClick={() => setActiveTab('attendance')}
+    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 font-bold text-xs uppercase tracking-widest transition-all
+        ${activeTab === 'attendance'
+            ? 'bg-black text-white border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)]'
+            : 'bg-white text-black border-black hover:bg-gray-100'
+        }`}>
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    Pointages IoT
+</button>
+
+
                     <button onClick={() => setActiveTab('add')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 font-bold text-xs uppercase tracking-widest transition-all
                             ${activeTab === 'add'
@@ -63,6 +90,7 @@ function App() {
                         </svg>
                         Ajouter
                     </button>
+
                     <button onClick={() => setActiveTab('list')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 font-bold text-xs uppercase tracking-widest transition-all
                             ${activeTab === 'list'
@@ -78,10 +106,11 @@ function App() {
                 </div>
 
                 {/* Content */}
-                {activeTab === 'add'
-                    ? <AddEmploye token={token} onEmployeAdded={handleEmployeAdded} />
-                    : <EmployeList token={token} refreshTrigger={refreshList} />
-                }
+                {activeTab === 'add' && <AddEmploye token={token} onEmployeAdded={handleEmployeAdded} />}
+                {activeTab === 'list' && <EmployeList token={token} refreshTrigger={refreshList} />}
+                {activeTab === 'departements' && <DepartementList token={token} />}
+                {activeTab === 'attendance' && <AttendanceDashboard token={token} />}
+                
             </main>
         </div>
     );

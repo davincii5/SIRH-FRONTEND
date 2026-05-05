@@ -8,6 +8,7 @@ const AddEmploye = ({ token, onEmployeAdded }) => {
         matricule: '', poste_titre: '', 
         departement: '', est_manager: false
     });
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
