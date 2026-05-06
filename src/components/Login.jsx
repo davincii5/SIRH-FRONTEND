@@ -13,8 +13,33 @@ const Login = ({ onLoginSuccess }) => {
         setError('');
         setLoading(true);
         try {
+            // Appel à l'API Django pour obtenir le token
             const response = await axios.post('http://127.0.0.1:8000/api/token/', credentials);
-            onLoginSuccess(response.data.access);
+            const token = response.data.access;
+
+            // ... (après avoir reçu la réponse de l'API avec le token)
+            let role = 'EMPLOYE'; 
+            let username = credentials.username;
+            let is_chef = false; // 👈 NOUVEAU : On prépare la variable
+
+            try {
+                // On décode le token JWT
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload.role) role = payload.role;
+                if (payload.username) username = payload.username;
+                
+                // 🚨 LA PIÈCE MANQUANTE EST ICI : On lit is_chef depuis le token !
+                if (payload.is_chef) is_chef = payload.is_chef; 
+                
+            } catch (e) {
+                console.warn("Impossible de décoder le payload.");
+            }
+
+            // On met is_chef dans userData pour que Layout.jsx puisse l'utiliser !
+            const userData = { username, role, is_chef }; 
+            
+            onLoginSuccess(token, userData);
+
         } catch (err) {
             setError("Identifiants incorrects. Veuillez réessayer.");
         } finally {
@@ -26,7 +51,7 @@ const Login = ({ onLoginSuccess }) => {
         <div className="min-h-screen bg-white flex items-center justify-center p-4">
             <div className="w-full max-w-md">
 
-                {/* Title */}
+                {/* Header SIRH */}
                 <div className="text-center mb-8">
                     <h1 className="text-6xl font-black tracking-tighter text-black">SIRH</h1>
                     <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mt-1">
@@ -34,10 +59,10 @@ const Login = ({ onLoginSuccess }) => {
                     </p>
                 </div>
 
-                {/* Card */}
+                {/* Carte de Connexion Style Néo-Brutaliste */}
                 <div className="bg-white border-2 border-black rounded-xl p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
 
-                    {/* Icon */}
+                    {/* Icône de cadenas */}
                     <div className="flex justify-center mb-6">
                         <div className="bg-gray-100 p-4 rounded-full border-2 border-black">
                             <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">

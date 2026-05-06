@@ -26,7 +26,7 @@ const DepartementList = ({ token }) => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNewDept({ nom_departement: '', description: '' });
-            fetchDepartements(); // Rafraîchir la liste
+            fetchDepartements();
         } catch (err) {
             alert("Erreur lors de la création du département.");
         }
@@ -68,15 +68,15 @@ const DepartementList = ({ token }) => {
 
             {/* Colonne de droite : Liste des départements */}
             <div className="lg:col-span-2">
-                <div className="bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] min-h-[400px]">
-                    <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
+                <div className="bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] min-h-[400px] max-h-[80vh] flex flex-col">
+                    <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4 shrink-0">
                         <h2 className="text-3xl font-black uppercase italic">Structure Organisationnelle</h2>
                         <div className="bg-yellow-300 border-2 border-black px-4 py-1 font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                             {departements.length} PÔLES
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto pr-2 no-scrollbar">
                         {departements.map(dept => (
                             <div key={dept.id} className="p-5 border-4 border-black bg-gray-50 hover:bg-yellow-100 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] group">
                                 <h4 className="font-black uppercase text-xl mb-1">{dept.nom_departement}</h4>
