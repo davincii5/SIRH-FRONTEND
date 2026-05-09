@@ -16,8 +16,23 @@ const Profile = ({ token, currentUser }) => {
             console.error("Erreur chargement profil :", error);
         }).finally(() => setLoading(false));
     }, [token, currentUser]);
+
+    // 👇 LA NOUVELLE FONCTION DE POINTAGE VIRTUEL 👇
+    const handlePointageVirtuel = () => {
+        axios.post('http://127.0.0.1:8000/api/payroll/pointage-virtuel/', {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(res => {
+            alert(res.data.message || "Pointage réussi !");
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erreur lors du pointage virtuel. L'API est-elle bien configurée ?");
+        });
+    };
     
-    if (!profileData) {
+    // Rendu pour l'Admin (qui n'a pas de profil d'employé)
+    if (!profileData && !loading && (currentUser.role === 'ADMIN' || currentUser.role === 'ADMINISTRATEUR')) {
         return (
             <div className="max-w-3xl mx-auto bg-white border-4 border-black p-12 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-center">
                 <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Profil Système</h2>
@@ -31,24 +46,21 @@ const Profile = ({ token, currentUser }) => {
             </div>
         );
     }
+
     if (loading) return <div className="text-center py-20 font-black uppercase tracking-widest">Chargement de votre profil...</div>;
 
     if (!profileData) return <div className="text-center py-20 font-black text-red-500 uppercase">Erreur : Impossible de charger le profil.</div>;
 
     // Formatage des compétences
-    // Formatage des compétences
     let competences = [];
     try {
-        // On récupère la donnée brute
         const rawData = typeof profileData.matrice_competences === 'string' 
             ? JSON.parse(profileData.matrice_competences) 
             : (profileData.matrice_competences || {});
 
-        // Si c'est un tableau (sauvegardé via le front)
         if (Array.isArray(rawData)) {
             competences = rawData;
         } 
-        // Si c'est un objet (venant du seed.py)
         else if (typeof rawData === 'object' && rawData !== null) {
             competences = Object.entries(rawData).map(([key, value]) => ({
                 competence: key,
@@ -61,19 +73,30 @@ const Profile = ({ token, currentUser }) => {
 
     return (
         <div className="max-w-4xl mx-auto bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
-            <div className="border-b-4 border-black pb-6 mb-8 flex items-center gap-6">
-                <img 
-                    src={`https://ui-avatars.com/api/?name=${profileData.username}&background=000&color=fff&size=128`} 
-                    className="w-24 h-24 rounded-full border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" 
-                    alt="avatar" 
-                />
-                <div>
-                    <h2 className="text-4xl font-black uppercase tracking-tighter">{profileData.username}</h2>
-                    <p className="text-xl font-bold text-gray-600 uppercase mt-1">{profileData.poste_titre || 'Poste non défini'}</p>
-                    <span className="inline-block mt-2 px-3 py-1 bg-yellow-300 border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                        {profileData.departement_nom || 'Département non assigné'}
-                    </span>
+            {/* --- EN-TÊTE DU PROFIL --- */}
+            <div className="border-b-4 border-black pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-6">
+                    <img 
+                        src={`https://ui-avatars.com/api/?name=${profileData.username}&background=000&color=fff&size=128`} 
+                        className="w-24 h-24 rounded-full border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" 
+                        alt="avatar" 
+                    />
+                    <div>
+                        <h2 className="text-4xl font-black uppercase tracking-tighter">{profileData.username}</h2>
+                        <p className="text-xl font-bold text-gray-600 uppercase mt-1">{profileData.poste_titre || 'Poste non défini'}</p>
+                        <span className="inline-block mt-2 px-3 py-1 bg-yellow-300 border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            {profileData.departement_nom || 'Département non assigné'}
+                        </span>
+                    </div>
                 </div>
+
+                {/* 👇 LE BOUTON EST PLACÉ ICI 👇 */}
+                <button 
+                    onClick={handlePointageVirtuel}
+                    className="bg-green-500 text-white font-black px-6 py-4 uppercase tracking-wider border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-green-400 active:translate-y-1 active:shadow-none transition-all"
+                >
+                    👆 Badger (Aujourd'hui)
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -128,7 +151,6 @@ const Profile = ({ token, currentUser }) => {
                                 <div key={index} className="flex justify-between items-center bg-white border-2 border-black p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 transition-transform">
                                     <span className="font-black uppercase text-sm">{comp.competence}</span>
                                     <div className="flex gap-1">
-                                        {/* Affichage visuel du niveau (petits carrés) */}
                                         {[1, 2, 3, 4, 5].map(niveau => (
                                             <div 
                                                 key={niveau} 

@@ -1,23 +1,33 @@
 import React from 'react';
 
 const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }) => {
-   const role = currentUser?.role?.toUpperCase() || 'EMPLOYE';
+    const role = currentUser?.role?.toUpperCase() || 'EMPLOYE';
     const isAdminOrRH = role === 'ADMIN' || role === 'ADMINISTRATEUR' || role === 'RH';
-    const isChef = currentUser?.is_chef===true;
+    const isChef = currentUser?.is_chef === true;
 
     // 1. Le menu de base (Visible par TOUT LE MONDE)
     const navItems = [
-        { id: 'profile', label: 'Mon Profil', icon: '👤' }, // 👈 NOUVEAU
+        { id: 'profile', label: 'Mon Profil', icon: '👤' }, 
+        { id: 'employee_leaves', label: 'Mes Congés', icon: '🏖️' }, // 👈 NOUVEAU : Demande de congé
     ];
 
-    // 2. Les menus sensibles (Visibles UNIQUEMENT par Admin et RH)
+    // 2. Les menus sensibles (Visibles UNIQUEMENT par Admin et RH ou Chef)
     if (isAdminOrRH || isChef) {
         navItems.push({ id: 'list', label: 'Annuaire', icon: '👥' });
     }
+    
+    // 3. Les menus ultra-sensibles (Visibles UNIQUEMENT par Admin et RH)
+    // 3. Les menus ultra-sensibles (Visibles UNIQUEMENT par Admin et RH)
     if (isAdminOrRH) {
-        navItems.push({ id: 'attendance', label: 'Présences', icon: '📅' });
+        // 👇 On garde l'IoT pour la démo Wokwi
+        navItems.push({ id: 'attendance_iot', label: 'Pointage Live (IoT)', icon: '📡' }); 
+        // 👇 On ajoute les bulles pour la gestion RH
+        navItems.push({ id: 'attendance_manual', label: 'Saisie Présences', icon: '✍️' }); 
+        
         navItems.push({ id: 'departements', label: 'Départements', icon: '🏢' });
         navItems.push({ id: 'add', label: 'Ajouter Employé', icon: '➕' });
+        navItems.push({ id: 'payroll', label: 'Gestion Paie', icon: '💰' });
+        navItems.push({ id: 'hr_leaves', label: 'Validation Congés', icon: '✅' });
     }
 
     return (
