@@ -15,21 +15,34 @@ const EmployeeLeave = ({ token, currentUser }) => {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(res => {
-            // 👇 LE FILTRE MAGIQUE EST ICI 👇
-            // On ne garde que les congés dont l'ID ou le username correspond à l'utilisateur connecté
-            const mesConges = res.data.filter(c => 
-                c.employe === currentUser.id || 
-                c.employe === currentUser.username ||
-                c.employe_name === currentUser.username
-            );
+            // 👇 LE FILTRE MAGIQUE CORRIGÉ 👇
+            // On s'assure de comparer des chaînes ou des nombres de manière fiable.
+            // currentUser.id ou currentUser.user_id (selon ce que votre token JWT renvoie)
+            const currentUserId = currentUser?.id || currentUser?.user_id;
+            
+            const mesConges = res.data.filter(c => {
+                // Si l'API renvoie un ID directement (ex: c.employe = 5)
+                if (c.employe === currentUserId) return true;
+                
+                // Si l'API renvoie un objet imbriqué (ex: c.employe = { id: 5, username: '...' })
+                if (c.employe && typeof c.employe === 'object' && c.employe.id === currentUserId) return true;
+
+                // Comparaison de fallback sur le nom d'utilisateur au cas où
+                if (c.employe_nom === currentUser?.username) return true;
+                
+                return false;
+            });
+            
             setConges(mesConges);
         })
-        .catch(err => console.error(err));
-    }, [token, currentUser]); // 👈 N'oublie pas d'ajouter currentUser dans les dépendances
+        .catch(err => console.error("Erreur lors du chargement des congés:", err));
+    }, [token, currentUser]);
 
     useEffect(() => {
-        fetchConges();
-    }, [fetchConges]);
+        if (currentUser) {
+            fetchConges();
+        }
+    }, [fetchConges, currentUser]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -40,10 +53,10 @@ const EmployeeLeave = ({ token, currentUser }) => {
         )
         .then(() => {
             alert("✅ Demande envoyée avec succès !");
-            fetchConges(); 
+            fetchConges(); // Recharge la liste immédiatement après l'ajout
             setFormData({ type_conge: 'ANNUEL', date_debut: '', date_fin: '', motif: '' }); 
         })
-        .catch(err => alert("Erreur lors de l'envoi de la demande."));
+        .catch(err => alert("Erreur lors de l'envoi de la demande. Vérifiez que toutes les dates sont valides."));
     };
 
     return (

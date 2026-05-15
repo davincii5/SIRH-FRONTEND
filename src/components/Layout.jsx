@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
     User, CalendarDays, Users, Radio, ClipboardList, 
-    Building2, UserPlus, Banknote, CalendarCheck, LogOut, ChevronDown, ChevronRight, Folder, Shield, Settings
+    Building2, UserPlus, Banknote, CalendarCheck, LogOut, ChevronDown, ChevronRight, Folder, Shield, Settings, LayoutDashboard
 } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }) => {
@@ -18,6 +18,7 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
     // 1. MENU ADMIN STRICT (Plat, sans profil)
     // ==========================================
     const adminFlatItems = [
+        { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
         { id: 'attendance_iot', label: 'Pointage Live (IoT)', icon: Radio },
         { id: 'attendance_manual', label: 'Saisie Présences', icon: ClipboardList },
         { id: 'hr_leaves', label: 'Validation Congés', icon: CalendarCheck },
@@ -58,6 +59,7 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
             title: 'Administration RH',
             icon: Folder,
             items: [
+                { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
                 { id: 'list', label: 'Annuaire Global', icon: Users },
                 { id: 'departements', label: 'Départements', icon: Building2 },
                 { id: 'add', label: 'Ajouter Employé', icon: UserPlus },

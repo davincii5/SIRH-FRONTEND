@@ -11,19 +11,26 @@ import Profile from './components/Profile';
 import EmployeeLeave from './components/EmployeeLeave';
 import HRLeaveManagement from './components/HRLeaveManagement';
 import ManualAttendance from './components/ManualAttendance';
+import DashboardAdmin from './components/DashboardAdmin';
 
 function App() {
     const [token, setToken] = useState(null);
-    const [currentUser, setCurrentUser] = useState(null); // Gérer l'utilisateur connecté
+    const [currentUser, setCurrentUser] = useState(null);
     
     const [refreshList, setRefreshList] = useState(false);
-    const [activeTab, setActiveTab] = useState('profile'); // 'list' par défaut au lieu de 'add'
+    const [activeTab, setActiveTab] = useState('profile');
 
-    // À adapter selon la structure de retour de ton API Login
     const handleLoginSuccess = (tokenData, userData) => {
         setToken(tokenData);
-        setCurrentUser(userData); // Ex: { username: 'admin', role: 'ADMIN' }
-        setActiveTab('profile'); // 👈 NOUVEAU : On force la vue sur le profil à la connexion
+        setCurrentUser(userData); 
+        
+        // 💡 REDIRECTION INTELLIGENTE SELON LE RÔLE
+        const role = userData?.role?.toUpperCase();
+        if (role === 'ADMIN' || role === 'ADMINISTRATEUR') {
+            setActiveTab('dashboard'); // L'admin atterrit direct sur ses stats
+        } else {
+            setActiveTab('profile'); // Les employés et RH atterrissent sur leur profil
+        }
     };
 
     const handleLogout = () => {
@@ -41,6 +48,8 @@ function App() {
     // Fonction pour afficher le bon composant selon l'onglet
     const renderActiveTab = () => {
         switch (activeTab) {
+            case 'dashboard': // 👈 AJOUT DU TABLEAU DE BORD
+                return <DashboardAdmin token={token} currentUser={currentUser} />;
             case 'profile':
                 return <Profile token={token} currentUser={currentUser} />;
             case 'employee_leaves':
@@ -53,30 +62,29 @@ function App() {
                 return <EmployeList token={token} refreshTrigger={refreshList} currentUser={currentUser} />;
             case 'departements':
                 return <DepartementList token={token} />;
-                
-            // 👇 LES DEUX PAGES DE PRÉSENCE SONT LÀ 👇
             case 'attendance_iot':
-                return <AttendanceDashboard token={token} />; // L'ancien dashboard MQTT
+                return <AttendanceDashboard token={token} />;
             case 'attendance_manual':
-                return <ManualAttendance token={token} />;    // Le nouveau avec les bulles
-            // 👆 ===================================== 👆
-            
+                return <ManualAttendance token={token} />;
             case 'payroll':
                 return <PayrollDashboard token={token} />;
             default:
-                return <EmployeList token={token} refreshTrigger={refreshList} currentUser={currentUser} />;
+                // Fallback de sécurité
+                const role = currentUser?.role?.toUpperCase();
+                if (role === 'ADMIN' || role === 'ADMINISTRATEUR') {
+                    return <DashboardAdmin token={token} currentUser={currentUser} />;
+                }
+                return <Profile token={token} currentUser={currentUser} />;
         }
     };
 
     return (
-        // Le Layout englobe tout, on lui passe les props nécessaires pour la navigation
         <Layout 
             activeTab={activeTab} 
             setActiveTab={setActiveTab} 
             handleLogout={handleLogout}
             currentUser={currentUser}
         >
-            {/* renderActiveTab() va remplacer la prop "children" dans le Layout */}
             {renderActiveTab()}
         </Layout>
     );
