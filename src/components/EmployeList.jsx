@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Users, UserMinus, UserX } from 'lucide-react';
 
 const EmployeList = ({ token, refreshTrigger, currentUser }) => {
     // 👑 1. GESTION DES RÔLES DÈS LE DÉBUT
-    // On met en majuscules pour éviter les erreurs de casse
     const userRole = currentUser?.role?.toUpperCase() || 'EMPLOYE';
-    
-    // 🚨 LA CORRECTION EST ICI : On accepte ADMIN, ADMINISTRATEUR et RH
     const canManageRH = (userRole === 'ADMIN' || userRole === 'ADMINISTRATEUR' || userRole === 'RH');
 
-    // 2. ÉTATS GLOBAUX
-    const [employes, setEmployes] = useState([]);
+    // 2. ÉTATS GLOBAUX POUR LES DONNÉES
+    const [viewMode, setViewMode] = useState('actifs'); // 'actifs', 'demission', 'licenciement'
+    const [employesActifs, setEmployesActifs] = useState([]);
+    const [employesArchives, setEmployesArchives] = useState([]);
     const [loading, setLoading] = useState(true);
     
     // États Modale Info/Édition
@@ -21,6 +21,9 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
     
     // État de la notification
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    
+    // NOUVEAU : État pour la modale de choix de date d'archivage
+    const [archiveModal, setArchiveModal] = useState({ show: false, typeDepart: '', date: '' });
 
     const showNotif = (message, type = 'success') => {
         setNotification({ show: true, message, type });
@@ -34,67 +37,84 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
     const [confirmName, setConfirmName] = useState("");
 
     // 3. RÉCUPÉRATION DES DONNÉES
-    const fetchEmployes = () => {
+    
+    // A. Récupérer les employés actifs
+    const fetchActifs = () => {
         setLoading(true);
         axios.get('http://127.0.0.1:8000/api/accounts/employes/', {
             headers: { Authorization: `Bearer ${token}` }
-        }).then(r => setEmployes(r.data))
-          .catch(e => console.error("Erreur chargement employés :", e))
-          .finally(() => setLoading(false));
+        }).then(r => {
+            setEmployesActifs(r.data);
+            setViewMode('actifs');
+        })
+        .catch(e => console.error("Erreur chargement employés :", e))
+        .finally(() => setLoading(false));
     };
 
+    // B. Récupérer les archives selon le motif
+    const fetchArchives = (motif) => {
+        setLoading(true);
+        axios.get(`http://127.0.0.1:8000/api/accounts/archives/?motif=${motif}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(r => {
+            setEmployesArchives(r.data);
+            setViewMode(motif.toLowerCase());
+        })
+        .catch(e => console.error(`Erreur chargement archives ${motif} :`, e))
+        .finally(() => setLoading(false));
+    };
+
+    // Chargement initial
     useEffect(() => {
-        fetchEmployes();
+        fetchActifs();
     }, [token, refreshTrigger]);
+
+    // Déterminer la liste à afficher dans le rendu
+    const displayedList = viewMode === 'actifs' ? employesActifs : employesArchives;
 
     // 4. OUVRIR LA FENÊTRE INFO ET PRÉPARER LES DONNÉES
     const handleOpenInfo = (emp) => {
-    setSelectedEmp(emp);
-    const contrat = emp.contrat_actuel || {}; 
+        setSelectedEmp(emp);
+        const contrat = emp.contrat_actuel || {}; 
 
-    let competencesArray = [];
-    try {
-        // On récupère la donnée brute (qu'elle soit string ou objet)
-        const rawData = typeof emp.matrice_competences === 'string' 
-            ? JSON.parse(emp.matrice_competences) 
-            : (emp.matrice_competences || {});
+        let competencesArray = [];
+        try {
+            const rawData = typeof emp.matrice_competences === 'string' 
+                ? JSON.parse(emp.matrice_competences) 
+                : (emp.matrice_competences || {});
 
-        // 🟢 CAS 1 : C'est un tableau (donnée sauvegardée depuis ce formulaire React)
-        if (Array.isArray(rawData)) {
-            competencesArray = rawData;
-        } 
-        // 🟢 CAS 2 : C'est un objet (donnée générée par ton seed.py)
-        else if (typeof rawData === 'object' && rawData !== null) {
-            competencesArray = Object.entries(rawData).map(([key, value]) => ({
-                competence: key,
-                // On s'assure de récupérer le niveau, que ce soit un format {"React": 5} ou {"React": {"level": 5}}
-                level: typeof value === 'number' ? value : (value.level || value.niveau || 1)
-            }));
+            if (Array.isArray(rawData)) {
+                competencesArray = rawData;
+            } 
+            else if (typeof rawData === 'object' && rawData !== null) {
+                competencesArray = Object.entries(rawData).map(([key, value]) => ({
+                    competence: key,
+                    level: typeof value === 'number' ? value : (value.level || value.niveau || 1)
+                }));
+            }
+        } catch (e) {
+            console.error("Erreur de parsing des compétences", e);
         }
-    } catch (e) {
-        console.error("Erreur de parsing des compétences", e);
-    }
-    
-    // Normalisation finale pour le formulaire
-    competencesArray = competencesArray.map(c => ({
-        competence: c.competence || '',
-        level: parseInt(c.level) || 1
-    }));
+        
+        competencesArray = competencesArray.map(c => ({
+            competence: c.competence || '',
+            level: parseInt(c.level) || 1
+        }));
 
-    setFormData({
-        username: emp.username || '',
-        poste_titre: emp.poste_titre || '',
-        matrice_competences: competencesArray,
-        statut: emp.statut || 'ACTIF',
-        contrat_id: contrat.id || null,
-        salaire_mensuel: contrat.salaire_mensuel || '',
-        type_contrat: contrat.type_contrat || 'CDI',
-        date_debut: contrat.date_debut || '',
-        date_fin: contrat.date_fin || '',
-    });
-    setIsEditing(false); 
-    setShowInfo(true);
-};
+        setFormData({
+            username: emp.username || '',
+            poste_titre: emp.poste_titre || '',
+            matrice_competences: competencesArray,
+            statut: emp.statut || 'ACTIF',
+            contrat_id: contrat.id || null,
+            salaire_mensuel: contrat.salaire_mensuel || '',
+            type_contrat: contrat.type_contrat || 'CDI',
+            date_debut: contrat.date_debut || '',
+            date_fin: contrat.date_fin || '',
+        });
+        setIsEditing(false); 
+        setShowInfo(true);
+    };
 
     // 5. GESTION DU FORMULAIRE CLASSIQUE
     const handleChange = (e) => {
@@ -122,7 +142,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
     // 7. SAUVEGARDER LES MODIFICATIONS
     const handleSave = async (e) => {
-        e.preventDefault(); // Ajout pour éviter le rechargement de la page
+        e.preventDefault();
         try {
             await axios.patch(`http://127.0.0.1:8000/api/accounts/employes/${selectedEmp.id}/`, {
                 username: canManageRH ? formData.username : undefined,
@@ -152,7 +172,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
             showNotif("Dossier mis à jour avec succès !", "success");
             setIsEditing(false);
-            fetchEmployes(); 
+            fetchActifs(); 
             setShowInfo(false);
 
         } catch (error) {
@@ -172,7 +192,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                 setShowDelete(false);
                 setSelectedEmp(null);
                 setConfirmName("");
-                fetchEmployes();
+                fetchActifs();
             } catch (err) {
                 showNotif("Erreur lors de la suppression.", "error");
             }
@@ -181,17 +201,23 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         }
     };
 
-    // 9. DÉCLENCHEUR N8N
-   const handleDeparture = async (typeDepart) => {
-        // typeDepart sera soit 'DEMISSIONNAIRE' soit 'LICENCIE'
+    // 9. DÉCLENCHEUR ARCHIVAGE ET N8N (Avec gestion de la date)
+    const confirmDeparture = async () => {
+        if (!archiveModal.date) {
+            showNotif("Veuillez sélectionner une date de départ valide.", "error");
+            return;
+        }
+
         try {
             await axios.patch(`http://127.0.0.1:8000/api/accounts/employes/${selectedEmp.id}/`, {
-                statut: typeDepart
+                statut: archiveModal.typeDepart,
+                date_depart: archiveModal.date // On envoie la date au backend
             }, { headers: { Authorization: `Bearer ${token}` }});
 
-            showNotif(`Dossier archivé (${typeDepart}) et n8n déclenché !`, "success");
-            fetchEmployes(); 
-            setShowInfo(false); // Ferme la fenêtre instantanément
+            showNotif(`Dossier archivé (${archiveModal.typeDepart}) avec succès !`, "success");
+            fetchActifs(); 
+            setShowInfo(false); 
+            setArchiveModal({ show: false, typeDepart: '', date: '' });
         } catch (error) {
             console.error(error);
             showNotif("Erreur lors du traitement du départ.", "error");
@@ -202,102 +228,171 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
     return (
         <>
-            {/* --- LISTE DES EMPLOYÉS --- */}
-            <div className={`transition-all duration-300 ${(showInfo || showDelete) ? 'blur-md pointer-events-none' : ''}`}>
+            {/* --- LISTE DES EMPLOYÉS OU ARCHIVES --- */}
+            <div className={`transition-all duration-300 ${(showInfo || showDelete || archiveModal.show) ? 'blur-md pointer-events-none' : ''}`}>
                 <div className="bg-white border-2 border-black rounded-xl p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
-                    <div className="mb-8 border-b border-gray-200 pb-6 flex justify-between items-end">
-                        <h2 className="text-2xl font-black tracking-tighter text-black flex items-center gap-3">
-                            Annuaire Smart Enterprise
-                        </h2>
-                        <div className="px-5 py-3 border-2 border-black rounded-xl bg-yellow-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                            <span className="block text-2xl font-black font-mono leading-none">{employes.length}</span>
-                            <span className="text-[10px] font-black uppercase">Membres</span>
+                    
+                    {/* EN-TÊTE ET BOUTONS DE NAVIGATION */}
+                    <div className="mb-8 border-b-4 border-black pb-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-2xl font-black tracking-tighter text-black">
+                                Annuaire Global
+                            </h2>
+                            <div className="px-4 py-2 border-2 border-black rounded-xl bg-yellow-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                                <span className="block text-xl font-black font-mono leading-none text-center">{displayedList.length}</span>
+                                <span className="text-[9px] font-black uppercase">Membres</span>
+                            </div>
+                        </div>
+
+                        {/* BOUTONS DE FILTRE (NÉO-BRUTALISTES) */}
+                        <div className="flex flex-wrap gap-3">
+                            <button 
+                                onClick={fetchActifs}
+                                className={`px-4 py-2.5 font-black text-xs uppercase border-2 border-black transition-all flex items-center gap-2 ${
+                                    viewMode === 'actifs' 
+                                    ? 'bg-black text-white shadow-none translate-y-1' 
+                                    : 'bg-green-300 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-none'
+                                }`}
+                            >
+                                <Users className="w-4 h-4" />
+                                Actifs
+                            </button>
+
+                            <button 
+                                onClick={() => fetchArchives('Démission')}
+                                className={`px-4 py-2.5 font-black text-xs uppercase border-2 border-black transition-all flex items-center gap-2 ${
+                                    viewMode === 'démission' 
+                                    ? 'bg-black text-white shadow-none translate-y-1' 
+                                    : 'bg-yellow-300 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-none'
+                                }`}
+                            >
+                                <UserMinus className="w-4 h-4" />
+                                Démissions
+                            </button>
+
+                            <button 
+                                onClick={() => fetchArchives('Licenciement')}
+                                className={`px-4 py-2.5 font-black text-xs uppercase border-2 border-black transition-all flex items-center gap-2 ${
+                                    viewMode === 'licenciement' 
+                                    ? 'bg-black text-white shadow-none translate-y-1' 
+                                    : 'bg-red-400 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-none'
+                                }`}
+                            >
+                                <UserX className="w-4 h-4" />
+                                Licenciements
+                            </button>
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        {employes.map((emp) => (
-                            <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex items-center justify-between hover:border-black hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-                                <div className="flex items-center gap-4">
-                                    <img src={`https://ui-avatars.com/api/?name=${emp.username}&background=000&color=fff`} className="w-11 h-11 rounded-full border-2 border-black" alt="avatar" />
-                                    <div>
-                                        <h4 className="font-black flex items-center gap-2">
-                                            {emp.username}
-                                            {emp.role === 'RH' && <span className="bg-blue-100 text-[9px] px-1.5 py-0.5 rounded border border-blue-400">RH</span>}
-                                        </h4>
-                                        <p className="text-xs text-gray-500 font-bold uppercase">{emp.poste_titre}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right hidden md:block border-r-2 border-gray-100 pr-4">
-                                        <span className="block font-mono font-black text-xs">{emp.matricule}</span>
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase">Matricule</span>
-                                    </div>
-                                    <span className="px-3 py-1 bg-black text-white text-[10px] font-black uppercase rounded-lg hidden sm:block">
-                                        {emp.departement_nom || 'Non assigné'}
-                                    </span>
+                    {/* LISTE DES CARTES */}
+                    <div className="space-y-4">
+                        {displayedList.length === 0 ? (
+                            <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                                <p className="font-black text-gray-400 uppercase tracking-widest">
+                                    Aucun dossier trouvé dans cette catégorie.
+                                </p>
+                            </div>
+                        ) : (
+                            displayedList.map((emp) => (
+                                <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between hover:border-black hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all gap-4">
                                     
-                                    <div className="flex gap-2 ml-2">
-                                        <button onClick={() => handleOpenInfo(emp)} className="bg-yellow-300 border-2 border-black px-4 py-1 font-black text-[10px] uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:shadow-none">
-                                            INFO
-                                        </button>
-                                        {canManageRH && (
-                                            <button onClick={() => { setSelectedEmp(emp); setShowDelete(true); }} className="bg-red-500 text-white border-2 border-black px-3 py-1 font-black text-[10px] uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:shadow-none">
-                                                SUPP
-                                            </button>
+                                    <div className="flex items-center gap-4">
+                                        <img src={`https://ui-avatars.com/api/?name=${emp.username}&background=000&color=fff`} className="w-12 h-12 rounded-full border-2 border-black" alt="avatar" />
+                                        <div>
+                                            <h4 className="font-black text-lg flex items-center gap-2">
+                                                {emp.username}
+                                                {viewMode === 'actifs' && emp.role === 'RH' && <span className="bg-blue-100 text-[10px] px-2 py-0.5 rounded border-2 border-blue-400 uppercase shadow-[1px_1px_0px_0px_rgba(59,130,246,1)]">RH</span>}
+                                            </h4>
+                                            <p className="text-sm text-gray-500 font-bold uppercase">{emp.poste_titre}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-4 border-t-2 md:border-t-0 pt-4 md:pt-0 border-gray-100">
+                                        <div className="text-left md:text-right border-r-2 border-gray-100 pr-4">
+                                            <span className="block font-mono font-black text-sm">{emp.matricule}</span>
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Matricule</span>
+                                        </div>
+
+                                        <div className="hidden sm:block">
+                                            <span className="px-3 py-1.5 bg-black text-white text-[10px] font-black uppercase rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(253,224,71,1)]">
+                                                {viewMode === 'actifs' ? (emp.departement_nom || 'Non assigné') : (emp.departement_nom || 'Ancien Dept.')}
+                                            </span>
+                                        </div>
+                                        
+                                        {/* Colonnes spécifiques Archives vs Actifs */}
+                                        {viewMode !== 'actifs' ? (
+                                            <div className="ml-2 flex items-center gap-3 bg-gray-50 px-3 py-2 border-2 border-gray-300 rounded">
+                                                <div className="text-center">
+                                                    {/* CORRECTION DE LA DATE ICI 👇 */}
+                                                    <span className="block text-red-600 font-black text-xs">
+                                                        {emp.date_depart ? new Date(emp.date_depart).toLocaleDateString('fr-FR') : 'Date Inconnue'}
+                                                    </span>
+                                                    <span className="text-[9px] uppercase font-bold text-gray-400">Date Sortie</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-2 ml-2">
+                                                <button onClick={() => handleOpenInfo(emp)} className="bg-yellow-300 border-2 border-black px-4 py-2 font-black text-[10px] uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all">
+                                                    INFO
+                                                </button>
+                                                {canManageRH && (
+                                                    <button onClick={() => { setSelectedEmp(emp); setShowDelete(true); }} className="bg-red-500 text-white border-2 border-black px-3 py-2 font-black text-[10px] uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all">
+                                                        SUPP
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* --- MODALE D'INFORMATIONS ET ÉDITION --- */}
-            {showInfo && selectedEmp && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20">
+            {/* --- MODALE D'INFORMATIONS ET ÉDITION (Seulement pour les Actifs) --- */}
+            {showInfo && selectedEmp && viewMode === 'actifs' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
                     <div className="bg-white border-4 border-black p-8 w-full max-w-4xl shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar">
-                        <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-2">
-                            <h3 className="text-2xl font-black uppercase">
+                        <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-4">
+                            <h3 className="text-3xl font-black uppercase tracking-tight">
                                 {isEditing ? 'Édition du Dossier' : 'Dossier Employé'}
                             </h3>
                             {!isEditing && (
-                                <button onClick={() => setIsEditing(true)} className="bg-blue-400 border-2 border-black px-4 py-1 font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                                <button onClick={() => setIsEditing(true)} className="bg-blue-400 border-2 border-black px-5 py-2 font-black text-xs uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-1 active:shadow-none transition-all">
                                     {canManageRH ? 'ÉDITER LE DOSSIER' : 'ÉVALUER COMPÉTENCES'}
                                 </button>
                             )}
                         </div>
 
                         <form onSubmit={handleSave}>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                 
                                 {/* --- COLONNE GAUCHE --- */}
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <div className="flex gap-4">
                                         <div className="flex-1">
-                                            <label className="block text-xs font-black text-gray-500 uppercase">Nom Complet</label>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1">Nom Complet</label>
                                             {isEditing && canManageRH ? (
-                                                <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none" />
+                                                <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full border-2 border-black p-3 font-bold focus:bg-yellow-50 outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" />
                                             ) : (
-                                                <p className="font-black text-lg uppercase">{formData.username}</p>
+                                                <p className="font-black text-xl uppercase border-b-2 border-gray-100 pb-2">{formData.username}</p>
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <label className="block text-xs font-black text-gray-500 uppercase">Poste</label>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1">Poste</label>
                                             {isEditing && canManageRH ? (
-                                                <input type="text" name="poste_titre" value={formData.poste_titre} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none" />
+                                                <input type="text" name="poste_titre" value={formData.poste_titre} onChange={handleChange} className="w-full border-2 border-black p-3 font-bold focus:bg-yellow-50 outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" />
                                             ) : (
-                                                <p className="font-bold uppercase">{formData.poste_titre}</p>
+                                                <p className="font-bold uppercase text-lg border-b-2 border-gray-100 pb-2">{formData.poste_titre}</p>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* COMPÉTENCES */}
-                                    <div className="mt-6 pt-4 border-t-4 border-black">
-                                        <label className="block text-sm font-black text-blue-600 uppercase mb-3">
-                                            Compétences (Matrice)
+                                    <div className="mt-8 pt-6 border-t-4 border-black">
+                                        <label className="block text-sm font-black text-blue-600 uppercase mb-4">
+                                            Matrice des Compétences
                                         </label>
                                         
                                         {isEditing ? (
@@ -309,12 +404,12 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                                             value={comp.competence} 
                                                             onChange={(e) => updateCompetence(index, 'competence', e.target.value)}
                                                             placeholder="Ex: Django, React..."
-                                                            className="flex-1 border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none text-sm"
+                                                            className="flex-1 border-2 border-black p-2.5 font-bold focus:bg-yellow-50 outline-none text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                                                         />
                                                         <select 
                                                             value={comp.level}
                                                             onChange={(e) => updateCompetence(index, 'level', parseInt(e.target.value))}
-                                                            className="border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none text-sm w-24 cursor-pointer"
+                                                            className="border-2 border-black p-2.5 font-bold focus:bg-yellow-50 outline-none text-sm w-24 cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                                                         >
                                                             <option value={1}>Niv 1</option>
                                                             <option value={2}>Niv 2</option>
@@ -325,7 +420,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                                         <button 
                                                             type="button"
                                                             onClick={() => removeCompetence(index)}
-                                                            className="bg-red-500 text-white border-2 border-black w-10 h-10 flex items-center justify-center font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none"
+                                                            className="bg-red-500 text-white border-2 border-black w-11 h-11 flex items-center justify-center font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none transition-all"
                                                             title="Supprimer"
                                                         >
                                                             X
@@ -335,18 +430,18 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                                 <button 
                                                     type="button"
                                                     onClick={addCompetence}
-                                                    className="mt-2 bg-blue-100 text-blue-800 border-2 border-black px-4 py-2 font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none w-full"
+                                                    className="mt-4 bg-blue-100 text-blue-800 border-2 border-black border-dashed px-4 py-3 font-black text-xs uppercase hover:bg-blue-200 w-full transition-colors"
                                                 >
                                                     + Ajouter une compétence
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-wrap gap-2">
+                                            <div className="flex flex-wrap gap-3">
                                                 {formData.matrice_competences.length > 0 ? (
                                                     formData.matrice_competences.map((comp, index) => (
-                                                        <div key={index} className="bg-yellow-300 border-2 border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+                                                        <div key={index} className="bg-yellow-300 border-2 border-black px-4 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
                                                             <span className="font-black text-xs uppercase">{comp.competence}</span>
-                                                            <span className="bg-black text-white px-1.5 py-0.5 text-[10px] font-bold rounded-sm">
+                                                            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold rounded">
                                                                 Niv. {comp.level}
                                                             </span>
                                                         </div>
@@ -361,76 +456,79 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
                                 {/* --- COLONNE DROITE : Paie et Contrat --- */}
                                 {canManageRH && (
-                                    <div className="space-y-4 bg-gray-50 p-6 border-4 border-black h-fit">
-                                        <div className="mt-2 border-b-4 border-black pb-4 mb-4">
-                                            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Statut Actuel</label>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-4 py-2 font-black text-xs border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
+                                    <div className="space-y-6 bg-gray-50 p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] h-fit">
+                                        <div className="border-b-4 border-black pb-5">
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-3">Gestion du Statut Actuel</label>
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className={`px-5 py-2 font-black text-xs border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] uppercase tracking-wide ${
                                                     formData.statut === 'ACTIF' ? 'bg-green-400 text-black' : 'bg-red-500 text-white'
                                                 }`}>
                                                     {formData.statut}
                                                 </span>
                                             </div>
+                                            
+                                            {/* Boutons d'Archivage - Néo-Brutalistes */}
                                             {isEditing && formData.statut === 'ACTIF' && (
-                                                <div className="w-full mt-3 flex flex-col gap-2">
+                                                <div className="w-full flex flex-col gap-3 mt-5">
+                                                    <p className="text-[10px] font-black text-red-600 uppercase italic">⚠️ Actions irréversibles :</p>
                                                     <button 
                                                         type="button" 
-                                                        onClick={() => handleDeparture('DEMISSIONNAIRE')} 
-                                                        className="w-full bg-purple-600 text-white border-2 border-black p-2 font-black text-[10px] uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2"
+                                                        onClick={() => setArchiveModal({ show: true, typeDepart: 'DEMISSIONNAIRE', date: new Date().toISOString().split('T')[0] })} 
+                                                        className="w-full bg-yellow-400 text-black border-2 border-black p-3 font-black text-[11px] uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2 hover:bg-yellow-500"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"></path></svg>
-                                                        DÉMISSION (ARCHIVER)
+                                                        <UserMinus className="w-4 h-4" />
+                                                        ARCHIVER (DÉMISSION)
                                                     </button>
                                                     <button 
                                                         type="button" 
-                                                        onClick={() => handleDeparture('LICENCIE')} 
-                                                        className="w-full bg-orange-500 text-white border-2 border-black p-2 font-black text-[10px] uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2"
+                                                        onClick={() => setArchiveModal({ show: true, typeDepart: 'LICENCIE', date: new Date().toISOString().split('T')[0] })} 
+                                                        className="w-full bg-red-500 text-white border-2 border-black p-3 font-black text-[11px] uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2 hover:bg-red-600"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"></path></svg>
-                                                        LICENCIEMENT (ARCHIVER)
+                                                        <UserX className="w-4 h-4" />
+                                                        ARCHIVER (LICENCIEMENT)
                                                     </button>
                                                 </div>
                                             )}
                                         </div>
 
-                                        <h4 className="font-black text-red-600 uppercase text-sm border-b-4 border-black pb-2 mb-4">Données RH (Confidentiel)</h4>
+                                        <h4 className="font-black text-red-600 uppercase text-sm border-b-2 border-red-200 pb-2">Données RH (Confidentiel)</h4>
                                         
                                         <div>
-                                            <label className="block text-xs font-black text-gray-500 uppercase">Salaire Mensuel (DH)</label>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1">Salaire Mensuel (DH)</label>
                                             {isEditing ? (
-                                                <input type="number" name="salaire_mensuel" value={formData.salaire_mensuel} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none" />
+                                                <input type="number" name="salaire_mensuel" value={formData.salaire_mensuel} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" />
                                             ) : (
-                                                <p className="font-black text-2xl text-green-600">{formData.salaire_mensuel ? `${formData.salaire_mensuel} DH` : 'Non défini'}</p>
+                                                <p className="font-black text-2xl text-green-600 bg-green-50 p-2 border-2 border-green-200 inline-block">{formData.salaire_mensuel ? `${formData.salaire_mensuel} DH` : 'Non défini'}</p>
                                             )}
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-black text-gray-500 uppercase">Type Contrat</label>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1">Type Contrat</label>
                                             {isEditing ? (
-                                                <select name="type_contrat" value={formData.type_contrat} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer">
+                                                <select name="type_contrat" value={formData.type_contrat} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                                                     <option value="CDI">CDI</option>
                                                     <option value="CDD">CDD</option>
                                                     <option value="STAGE">STAGE</option>
                                                 </select>
                                             ) : (
-                                                <p className="font-bold uppercase">{formData.type_contrat}</p>
+                                                <p className="font-bold uppercase text-lg">{formData.type_contrat}</p>
                                             )}
                                         </div>
 
                                         <div className="flex gap-4 pt-2">
                                             <div className="flex-1">
-                                                <label className="block text-xs font-black text-gray-500 uppercase">Date Début</label>
+                                                <label className="block text-xs font-black text-gray-500 uppercase mb-1">Date Début</label>
                                                 {isEditing ? (
-                                                    <input type="date" name="date_debut" value={formData.date_debut} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer" />
+                                                    <input type="date" name="date_debut" value={formData.date_debut} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" />
                                                 ) : (
                                                     <p className="font-bold">{formData.date_debut || '-'}</p>
                                                 )}
                                             </div>
                                             {(formData.type_contrat === 'CDD' || formData.type_contrat === 'STAGE') && (
                                                 <div className="flex-1">
-                                                    <label className="block text-xs font-black text-gray-500 uppercase">Date Fin</label>
+                                                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Date Fin</label>
                                                     {isEditing ? (
-                                                        <input type="date" name="date_fin" value={formData.date_fin} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer" />
+                                                        <input type="date" name="date_fin" value={formData.date_fin} onChange={handleChange} className="w-full border-2 border-black p-2 font-bold focus:bg-yellow-50 outline-none cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" />
                                                     ) : (
                                                         <p className="font-bold text-red-600">{formData.date_fin || '-'}</p>
                                                     )}
@@ -442,14 +540,14 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                             </div>
 
                             {/* Actions du bas */}
-                            <div className="flex gap-4 mt-8 pt-6 border-t-4 border-black">
+                            <div className="flex gap-4 mt-10 pt-6 border-t-4 border-black">
                                 {isEditing ? (
                                     <>
-                                        <button type="submit" className="flex-1 bg-black text-white p-3 font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] active:translate-y-1">Enregistrer</button>
-                                        <button type="button" onClick={() => setIsEditing(false)} className="flex-1 border-2 border-black p-3 font-black uppercase text-sm hover:bg-gray-100">Annuler</button>
+                                        <button type="submit" className="flex-1 bg-black text-white p-4 font-black uppercase text-sm shadow-[6px_6px_0px_0px_rgba(253,224,71,1)] hover:-translate-y-1 active:translate-y-1 active:shadow-none transition-all">Enregistrer les Modifications</button>
+                                        <button type="button" onClick={() => setIsEditing(false)} className="flex-1 border-4 border-black p-4 font-black uppercase text-sm hover:bg-gray-100 transition-colors">Annuler</button>
                                     </>
                                 ) : (
-                                    <button type="button" onClick={() => setShowInfo(false)} className="w-full bg-black text-white p-3 font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] active:translate-y-1">Fermer</button>
+                                    <button type="button" onClick={() => setShowInfo(false)} className="w-full bg-black text-white p-4 font-black uppercase text-sm shadow-[6px_6px_0px_0px_rgba(100,100,100,1)] hover:-translate-y-1 active:translate-y-1 active:shadow-none transition-all">Fermer le Dossier</button>
                                 )}
                             </div>
                         </form>
@@ -459,22 +557,52 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
             {/* --- MODALE SUPPRIMER --- */}
             {showDelete && selectedEmp && canManageRH && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
                     <div className="bg-white border-4 border-black p-8 w-full max-w-sm shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200">
-                        <h3 className="text-xl font-black uppercase text-red-600 mb-4 italic">Confirmation Critique</h3>
-                        <p className="text-xs font-bold uppercase mb-4 leading-tight">
-                            Pour supprimer <span className="underline">{selectedEmp.username}</span>, veuillez saisir son nom ci-dessous :
+                        <h3 className="text-2xl font-black uppercase text-red-600 mb-2 border-b-4 border-red-600 pb-2">Destruction</h3>
+                        <p className="text-sm font-bold mt-4 mb-6 leading-relaxed">
+                            Pour effacer définitivement <span className="bg-yellow-300 px-1 border border-black">{selectedEmp.username}</span>, veuillez taper son nom exact :
                         </p>
                         <input 
                             type="text" 
                             value={confirmName}
                             onChange={(e) => setConfirmName(e.target.value)}
-                            className="w-full border-2 border-black p-2 mb-6 font-bold bg-red-50 outline-none" 
+                            className="w-full border-4 border-black p-3 mb-6 font-black bg-red-50 outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]" 
                             placeholder="Nom exact"
                         />
                         <div className="flex gap-4">
-                            <button onClick={handleDelete} className="flex-1 bg-red-600 text-white p-3 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] active:translate-y-1">Supprimer</button>
-                            <button onClick={() => { setShowDelete(false); setConfirmName(""); }} className="flex-1 border-2 border-black p-3 font-black uppercase text-xs hover:bg-gray-100">Annuler</button>
+                            <button onClick={handleDelete} className="flex-1 bg-red-600 text-white p-3 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all">Supprimer</button>
+                            <button onClick={() => { setShowDelete(false); setConfirmName(""); }} className="flex-1 border-4 border-black p-3 font-black uppercase text-xs hover:bg-gray-100 transition-colors">Annuler</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODALE DATE ARCHIVAGE --- */}
+            {archiveModal.show && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white border-4 border-black p-6 w-full max-w-sm shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in duration-200">
+                        <h3 className="text-xl font-black uppercase border-b-4 border-black pb-2 mb-4">
+                            {archiveModal.typeDepart === 'DEMISSIONNAIRE' ? 'Détails Démission' : 'Détails Licenciement'}
+                        </h3>
+                        
+                        <label className="block text-xs font-black text-gray-500 uppercase mb-2">
+                            Date effective du départ :
+                        </label>
+                        <input 
+                            type="date" 
+                            value={archiveModal.date}
+                            onChange={(e) => setArchiveModal({ ...archiveModal, date: e.target.value })}
+                            className="w-full border-4 border-black p-3 font-bold bg-yellow-50 outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mb-6 cursor-pointer" 
+                        />
+                        
+                        <div className="flex gap-4">
+                            <button onClick={confirmDeparture} className="flex-1 bg-black text-white p-3 font-black uppercase text-xs shadow-[3px_3px_0px_0px_rgba(100,100,100,1)] active:translate-y-1 active:shadow-none transition-all">
+                                Confirmer
+                            </button>
+                            <button onClick={() => setArchiveModal({ show: false, typeDepart: '', date: '' })} className="flex-1 border-4 border-black p-3 font-black uppercase text-xs hover:bg-gray-100 transition-colors">
+                                Annuler
+                            </button>
                         </div>
                     </div>
                 </div>
