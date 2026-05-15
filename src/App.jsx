@@ -12,6 +12,7 @@ import EmployeeLeave from './components/EmployeeLeave';
 import HRLeaveManagement from './components/HRLeaveManagement';
 import ManualAttendance from './components/ManualAttendance';
 import DashboardAdmin from './components/DashboardAdmin';
+import FloatingChat from './components/Floatingchat';
 
 function App() {
     const [token, setToken] = useState(null);
@@ -24,12 +25,11 @@ function App() {
         setToken(tokenData);
         setCurrentUser(userData); 
         
-        // 💡 REDIRECTION INTELLIGENTE SELON LE RÔLE
         const role = userData?.role?.toUpperCase();
         if (role === 'ADMIN' || role === 'ADMINISTRATEUR') {
-            setActiveTab('dashboard'); // L'admin atterrit direct sur ses stats
+            setActiveTab('dashboard');
         } else {
-            setActiveTab('profile'); // Les employés et RH atterrissent sur leur profil
+            setActiveTab('profile');
         }
     };
 
@@ -45,10 +45,9 @@ function App() {
 
     if (!token) return <Login onLoginSuccess={handleLoginSuccess} />;
 
-    // Fonction pour afficher le bon composant selon l'onglet
     const renderActiveTab = () => {
         switch (activeTab) {
-            case 'dashboard': // 👈 AJOUT DU TABLEAU DE BORD
+            case 'dashboard':
                 return <DashboardAdmin token={token} currentUser={currentUser} />;
             case 'profile':
                 return <Profile token={token} currentUser={currentUser} />;
@@ -69,24 +68,22 @@ function App() {
             case 'payroll':
                 return <PayrollDashboard token={token} />;
             default:
-                // Fallback de sécurité
-                const role = currentUser?.role?.toUpperCase();
-                if (role === 'ADMIN' || role === 'ADMINISTRATEUR') {
-                    return <DashboardAdmin token={token} currentUser={currentUser} />;
-                }
                 return <Profile token={token} currentUser={currentUser} />;
         }
     };
 
     return (
-        <Layout 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            handleLogout={handleLogout}
-            currentUser={currentUser}
-        >
-            {renderActiveTab()}
-        </Layout>
+        <>
+            <Layout 
+                activeTab={activeTab} 
+                setActiveTab={setActiveTab} 
+                handleLogout={handleLogout}
+                currentUser={currentUser}
+            >
+                {renderActiveTab()}
+            </Layout>
+            <FloatingChat token={token} currentUser={currentUser} />
+        </>
     );
 }
 

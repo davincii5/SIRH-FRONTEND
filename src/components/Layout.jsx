@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
 import { 
     User, CalendarDays, Users, Radio, ClipboardList, 
-    Building2, UserPlus, Banknote, CalendarCheck, LogOut, ChevronDown, ChevronRight, Folder, Shield, Settings, LayoutDashboard
+    Building2, UserPlus, Banknote, CalendarCheck, LogOut, ChevronDown, ChevronRight, 
+    Folder, Shield, Settings, LayoutDashboard
 } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }) => {
     const role = currentUser?.role?.toUpperCase() || 'EMPLOYE';
     
-    // Définition stricte des rôles
     const isAdmin = role === 'ADMIN' || role === 'ADMINISTRATEUR';
     const isRH = role === 'RH';
     const isChef = currentUser?.is_chef === true;
 
     const [openMenu, setOpenMenu] = useState('Gestion des Temps'); 
 
-    // ==========================================
-    // 1. MENU ADMIN STRICT (Plat, sans profil)
-    // ==========================================
     const adminFlatItems = [
         { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
         { id: 'attendance_iot', label: 'Pointage Live (IoT)', icon: Radio },
@@ -28,9 +25,6 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
         { id: 'payroll', label: 'Gestion Paie', icon: Banknote },
     ];
 
-    // ==========================================
-    // 2. MENU DE BASE (Pour Employé, Chef, RH)
-    // ==========================================
     const baseNavItems = [
         { id: 'profile', label: 'Mon Profil', icon: User }, 
         { id: 'employee_leaves', label: 'Mes Congés', icon: CalendarDays },
@@ -40,9 +34,6 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
         baseNavItems.push({ id: 'list', label: 'Annuaire Équipe', icon: Users });
     }
 
-    // ==========================================
-    // 3. MENU RH COMPLEXE (Avec Accordéon)
-    // ==========================================
     const rhCategories = [];
     if (isRH) {
         rhCategories.push({
@@ -71,7 +62,6 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
     return (
         <div className="h-screen w-full overflow-hidden bg-white flex flex-col font-sans selection:bg-yellow-300 selection:text-black">
             
-            {/* --- TOP HEADER --- */}
             <header className="border-b-4 border-black p-4 flex justify-between items-center bg-white z-10 shrink-0">
                 <div className="flex items-center gap-4">
                     <span className="bg-black text-white px-3 py-1.5 font-black text-xl tracking-tighter shadow-[3px_3px_0px_0px_rgba(253,224,71,1)]">
@@ -101,16 +91,11 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                 </div>
             </header>
 
-            {/* --- CORPS DE LA PAGE --- */}
             <div className="flex flex-1 overflow-hidden">
                 
-                {/* SIDEBAR NAVIGATION */}
                 <aside className="w-72 border-r-4 border-black bg-gray-50 flex flex-col p-6 gap-6 hidden md:flex overflow-y-auto shrink-0">
                     
                     {isAdmin ? (
-                        /* ====================================================
-                           VUE ADMINISTRATEUR STRICTE (Plat, pas de profil) 
-                           ==================================================== */
                         <div className="flex flex-col gap-3">
                             <h2 className="font-black text-[10px] text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
                                 <Settings className="w-4 h-4 text-black" /> Panneau de Contrôle
@@ -136,11 +121,7 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                             })}
                         </div>
                     ) : (
-                        /* ====================================================
-                           VUE EMPLOYÉ / CHEF / RH (Avec Espace Personnel) 
-                           ==================================================== */
                         <>
-                            {/* SECTION 1: Espace Personnel */}
                             <div className="flex flex-col gap-3">
                                 <h2 className="font-black text-[10px] text-gray-400 uppercase tracking-widest px-1">
                                     Mon Espace
@@ -166,7 +147,6 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                                 })}
                             </div>
 
-                            {/* SECTION 2: Outils RH (Accordéon) */}
                             {isRH && rhCategories.length > 0 && (
                                 <div className="flex flex-col gap-3 pt-4 border-t-4 border-gray-200">
                                     <h2 className="font-black text-[10px] text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
@@ -221,7 +201,6 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                         </>
                     )}
 
-                    {/* Espace Info Système (Affiché pour Admin et RH) */}
                     {(isAdmin || isRH) && (
                         <div className="mt-auto pt-6 border-t-4 border-black">
                             <div className="bg-purple-200 p-4 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden">
@@ -238,14 +217,12 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                     )}
                 </aside>
 
-                {/* CONTENU PRINCIPAL */}
                 <main className="flex-1 p-8 overflow-y-auto bg-slate-50 relative">
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none opacity-50"></div>
                     <div className="relative z-0 min-h-full pb-10">
                         {children}
                     </div>
                 </main>
-                
             </div>
         </div>
     );

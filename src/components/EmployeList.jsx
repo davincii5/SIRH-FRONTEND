@@ -1,28 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users, UserMinus, UserX } from 'lucide-react';
+import { Users, UserMinus, UserX, Search } from 'lucide-react';
 
 const EmployeList = ({ token, refreshTrigger, currentUser }) => {
-    // 👑 1. GESTION DES RÔLES DÈS LE DÉBUT
     const userRole = currentUser?.role?.toUpperCase() || 'EMPLOYE';
     const canManageRH = (userRole === 'ADMIN' || userRole === 'ADMINISTRATEUR' || userRole === 'RH');
 
-    // 2. ÉTATS GLOBAUX POUR LES DONNÉES
-    const [viewMode, setViewMode] = useState('actifs'); // 'actifs', 'demission', 'licenciement'
+    const [viewMode, setViewMode] = useState('actifs');
     const [employesActifs, setEmployesActifs] = useState([]);
     const [employesArchives, setEmployesArchives] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
     
-    // États Modale Info/Édition
     const [selectedEmp, setSelectedEmp] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
     
-    // État de la notification
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
     
-    // NOUVEAU : État pour la modale de choix de date d'archivage
     const [archiveModal, setArchiveModal] = useState({ show: false, typeDepart: '', date: '' });
 
     const showNotif = (message, type = 'success') => {
@@ -32,13 +28,9 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         }, 3000);
     };
 
-    // États Modale Suppression
     const [showDelete, setShowDelete] = useState(false);
     const [confirmName, setConfirmName] = useState("");
 
-    // 3. RÉCUPÉRATION DES DONNÉES
-    
-    // A. Récupérer les employés actifs
     const fetchActifs = () => {
         setLoading(true);
         axios.get('http://127.0.0.1:8000/api/accounts/employes/', {
@@ -51,7 +43,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         .finally(() => setLoading(false));
     };
 
-    // B. Récupérer les archives selon le motif
     const fetchArchives = (motif) => {
         setLoading(true);
         axios.get(`http://127.0.0.1:8000/api/accounts/archives/?motif=${motif}`, {
@@ -64,15 +55,23 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         .finally(() => setLoading(false));
     };
 
-    // Chargement initial
     useEffect(() => {
         fetchActifs();
     }, [token, refreshTrigger]);
 
-    // Déterminer la liste à afficher dans le rendu
     const displayedList = viewMode === 'actifs' ? employesActifs : employesArchives;
 
-    // 4. OUVRIR LA FENÊTRE INFO ET PRÉPARER LES DONNÉES
+    // ─── FILTRE PAR RECHERCHE ───
+    const filteredList = displayedList.filter(emp => {
+        const query = searchQuery.toLowerCase();
+        return (
+            (emp.username || '').toLowerCase().includes(query) ||
+            (emp.poste_titre || '').toLowerCase().includes(query) ||
+            (emp.matricule || '').toLowerCase().includes(query) ||
+            (emp.departement_nom || '').toLowerCase().includes(query)
+        );
+    });
+
     const handleOpenInfo = (emp) => {
         setSelectedEmp(emp);
         const contrat = emp.contrat_actuel || {}; 
@@ -116,12 +115,10 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         setShowInfo(true);
     };
 
-    // 5. GESTION DU FORMULAIRE CLASSIQUE
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // 6. GESTION DYNAMIQUE DES COMPÉTENCES
     const updateCompetence = (index, field, value) => {
         const nouvellesCompetences = [...formData.matrice_competences];
         nouvellesCompetences[index] = { ...nouvellesCompetences[index], [field]: value };
@@ -140,7 +137,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         setFormData({ ...formData, matrice_competences: nouvellesCompetences });
     };
 
-    // 7. SAUVEGARDER LES MODIFICATIONS
     const handleSave = async (e) => {
         e.preventDefault();
         try {
@@ -181,7 +177,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         }
     };
 
-    // 8. SUPPRIMER UN EMPLOYÉ
     const handleDelete = async () => {
         if (confirmName === selectedEmp.username) {
             try {
@@ -201,7 +196,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         }
     };
 
-    // 9. DÉCLENCHEUR ARCHIVAGE ET N8N (Avec gestion de la date)
     const confirmDeparture = async () => {
         if (!archiveModal.date) {
             showNotif("Veuillez sélectionner une date de départ valide.", "error");
@@ -211,7 +205,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
         try {
             await axios.patch(`http://127.0.0.1:8000/api/accounts/employes/${selectedEmp.id}/`, {
                 statut: archiveModal.typeDepart,
-                date_depart: archiveModal.date // On envoie la date au backend
+                date_depart: archiveModal.date
             }, { headers: { Authorization: `Bearer ${token}` }});
 
             showNotif(`Dossier archivé (${archiveModal.typeDepart}) avec succès !`, "success");
@@ -228,23 +222,20 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
 
     return (
         <>
-            {/* --- LISTE DES EMPLOYÉS OU ARCHIVES --- */}
             <div className={`transition-all duration-300 ${(showInfo || showDelete || archiveModal.show) ? 'blur-md pointer-events-none' : ''}`}>
                 <div className="bg-white border-2 border-black rounded-xl p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
                     
-                    {/* EN-TÊTE ET BOUTONS DE NAVIGATION */}
                     <div className="mb-8 border-b-4 border-black pb-6 flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-4">
                             <h2 className="text-2xl font-black tracking-tighter text-black">
                                 Annuaire Global
                             </h2>
                             <div className="px-4 py-2 border-2 border-black rounded-xl bg-yellow-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                                <span className="block text-xl font-black font-mono leading-none text-center">{displayedList.length}</span>
+                                <span className="block text-xl font-black font-mono leading-none text-center">{filteredList.length}</span>
                                 <span className="text-[9px] font-black uppercase">Membres</span>
                             </div>
                         </div>
 
-                        {/* BOUTONS DE FILTRE (NÉO-BRUTALISTES) */}
                         <div className="flex flex-wrap gap-3">
                             <button 
                                 onClick={fetchActifs}
@@ -284,16 +275,37 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                         </div>
                     </div>
 
-                    {/* LISTE DES CARTES */}
+                    {/* ─── BARRE DE RECHERCHE ─── */}
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 border-2 border-black bg-white px-4 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-w-md">
+                            <Search className="w-5 h-5 text-gray-500" />
+                            <input 
+                                type="text"
+                                placeholder="Rechercher par nom, poste, matricule..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="flex-1 bg-transparent outline-none font-bold text-sm uppercase placeholder:font-bold placeholder:text-gray-400"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="text-gray-400 hover:text-black font-black text-xs"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="space-y-4">
-                        {displayedList.length === 0 ? (
+                        {filteredList.length === 0 ? (
                             <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
                                 <p className="font-black text-gray-400 uppercase tracking-widest">
-                                    Aucun dossier trouvé dans cette catégorie.
+                                    {searchQuery ? 'Aucun résultat trouvé.' : 'Aucun dossier trouvé dans cette catégorie.'}
                                 </p>
                             </div>
                         ) : (
-                            displayedList.map((emp) => (
+                            filteredList.map((emp) => (
                                 <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between hover:border-black hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all gap-4">
                                     
                                     <div className="flex items-center gap-4">
@@ -319,11 +331,9 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                             </span>
                                         </div>
                                         
-                                        {/* Colonnes spécifiques Archives vs Actifs */}
                                         {viewMode !== 'actifs' ? (
                                             <div className="ml-2 flex items-center gap-3 bg-gray-50 px-3 py-2 border-2 border-gray-300 rounded">
                                                 <div className="text-center">
-                                                    {/* CORRECTION DE LA DATE ICI 👇 */}
                                                     <span className="block text-red-600 font-black text-xs">
                                                         {emp.date_depart ? new Date(emp.date_depart).toLocaleDateString('fr-FR') : 'Date Inconnue'}
                                                     </span>
@@ -350,7 +360,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                 </div>
             </div>
 
-            {/* --- MODALE D'INFORMATIONS ET ÉDITION (Seulement pour les Actifs) --- */}
+            {/* --- MODALE D'INFORMATIONS ET ÉDITION --- */}
             {showInfo && selectedEmp && viewMode === 'actifs' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
                     <div className="bg-white border-4 border-black p-8 w-full max-w-4xl shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar">
@@ -368,7 +378,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                 
-                                {/* --- COLONNE GAUCHE --- */}
                                 <div className="space-y-6">
                                     <div className="flex gap-4">
                                         <div className="flex-1">
@@ -389,7 +398,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                         </div>
                                     </div>
 
-                                    {/* COMPÉTENCES */}
                                     <div className="mt-8 pt-6 border-t-4 border-black">
                                         <label className="block text-sm font-black text-blue-600 uppercase mb-4">
                                             Matrice des Compétences
@@ -454,7 +462,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                     </div>
                                 </div>
 
-                                {/* --- COLONNE DROITE : Paie et Contrat --- */}
                                 {canManageRH && (
                                     <div className="space-y-6 bg-gray-50 p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] h-fit">
                                         <div className="border-b-4 border-black pb-5">
@@ -467,7 +474,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                                 </span>
                                             </div>
                                             
-                                            {/* Boutons d'Archivage - Néo-Brutalistes */}
                                             {isEditing && formData.statut === 'ACTIF' && (
                                                 <div className="w-full flex flex-col gap-3 mt-5">
                                                     <p className="text-[10px] font-black text-red-600 uppercase italic">⚠️ Actions irréversibles :</p>
@@ -539,7 +545,6 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                                 )}
                             </div>
 
-                            {/* Actions du bas */}
                             <div className="flex gap-4 mt-10 pt-6 border-t-4 border-black">
                                 {isEditing ? (
                                     <>
@@ -608,7 +613,7 @@ const EmployeList = ({ token, refreshTrigger, currentUser }) => {
                 </div>
             )}
 
-            {/* --- TOAST NOTIFICATION NEO-BRUTALISTE --- */}
+            {/* --- TOAST NOTIFICATION --- */}
             {notification.show && (
                 <div className={`fixed bottom-8 right-8 z-[100] px-6 py-4 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all ${
                     notification.type === 'success' ? 'bg-green-400 text-black' : 'bg-red-500 text-white'
