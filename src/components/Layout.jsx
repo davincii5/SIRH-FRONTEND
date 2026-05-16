@@ -73,10 +73,7 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                 </div>
                 
                 <div className="flex items-center gap-6">
-                    <div className="text-right hidden sm:block">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                            Session active
-                        </p>
+                    <div className="flex items-center gap-2">
                         <p className="font-black text-sm uppercase bg-yellow-300 px-3 py-1 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-block">
                             {currentUser?.username || 'Utilisateur'} ({role})
                         </p>
@@ -93,7 +90,10 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
 
             <div className="flex flex-1 overflow-hidden">
                 
-                <aside className="w-72 border-r-4 border-black bg-gray-50 flex flex-col p-6 gap-6 hidden md:flex overflow-y-auto shrink-0">
+                <aside 
+                    className="w-72 border-r-4 border-black bg-gray-50 flex flex-col p-6 gap-6 hidden md:flex overflow-y-auto shrink-0 [&::-webkit-scrollbar]:hidden" 
+                    style={{ scrollbarWidth: 'none' }}
+                >
                     
                     {isAdmin ? (
                         <div className="flex flex-col gap-3">
@@ -201,20 +201,7 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
                         </>
                     )}
 
-                    {(isAdmin || isRH) && (
-                        <div className="mt-auto pt-6 border-t-4 border-black">
-                            <div className="bg-purple-200 p-4 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-                                <div className="absolute -right-4 -top-4 bg-purple-300 w-12 h-12 rounded-full opacity-50"></div>
-                                <p className="font-black text-[10px] uppercase mb-2 text-black tracking-wider flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                                    Accès Privilégié
-                                </p>
-                                <p className="text-xs font-bold text-gray-800 leading-relaxed">
-                                    Vous avez accès aux données sensibles de l'entreprise.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    
                 </aside>
 
                 <main className="flex-1 p-8 overflow-y-auto bg-slate-50 relative">

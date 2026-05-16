@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Users, Banknote, UserCheck, TrendingUp, BellRing } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { 
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+    PieChart, Pie, Cell, CartesianGrid
+} from 'recharts';
 
 const DashboardAdmin = ({ token, currentUser }) => {
     const [stats, setStats] = useState(null);
@@ -21,21 +24,17 @@ const DashboardAdmin = ({ token, currentUser }) => {
         });
     }, [token]);
 
-    // 👇 NOUVELLE FONCTION : Validation/Refus Rapide
-    // 👇 NOUVELLE FONCTION : Validation/Refus Rapide
     const handleUpdateConge = async (id, newStatus) => {
         try {
             await axios.patch(`http://127.0.0.1:8000/api/payroll/conges/${id}/`, {
                 statut: newStatus
             }, { headers: { Authorization: `Bearer ${token}` }});
             
-            // Mise à jour instantanée de l'UI
             setStats(prev => ({
                 ...prev,
                 conges_attente: prev.conges_attente.filter(c => c.id !== id)
             }));
         } catch (error) {
-            // SÉCURITÉ : On affiche l'erreur EXACTE renvoyée par Django
             console.error("Détail de l'erreur 400 :", error.response?.data);
             
             const messageErreur = error.response?.data?.statut 
@@ -160,77 +159,74 @@ const DashboardAdmin = ({ token, currentUser }) => {
                 </div>
             </div>
 
-            {/* --- CHARTS ROW 2 (MODIFIÉE) --- */}
+            {/* --- CHARTS ROW 2 --- */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* 2/3 de l'espace : Graphique des présences */}
+                {/* 2/3 : BarChart groupé pour les présences */}
                 <div className="lg:col-span-2 bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                     <h3 className="font-black uppercase text-sm mb-6 border-b-2 border-gray-100 pb-2">Suivi des Présences (5 Derniers Jours)</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={stats.charts.presences_semaine} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <BarChart data={stats.charts.presences_semaine} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#000' }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#000' }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="presents" stroke="#4ade80" strokeWidth={4} dot={{ stroke: '#000', strokeWidth: 2, r: 4, fill: '#4ade80' }} activeDot={{ r: 6, stroke: '#000', strokeWidth: 2 }} name="Présents" />
-                                <Line type="monotone" dataKey="absents" stroke="#ef4444" strokeWidth={4} dot={{ stroke: '#000', strokeWidth: 2, r: 4, fill: '#ef4444' }} activeDot={{ r: 6, stroke: '#000', strokeWidth: 2 }} name="Absents" />
-                            </LineChart>
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f3f4f6' }} />
+                                <Bar dataKey="presents" fill="#4ade80" stroke="#000" strokeWidth={2} radius={[4, 4, 0, 0]} barSize={24} name="Présents" />
+                                <Bar dataKey="absents" fill="#ef4444" stroke="#000" strokeWidth={2} radius={[4, 4, 0, 0]} barSize={24} name="Absents" />
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* 1/3 de l'espace : Actions Rapides Congés */}
+                {/* 1/3 : Actions Rapides Congés */}
                 <div className="bg-cyan-200 border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col max-h-[350px]">
-    <div className="flex justify-between items-center border-b-4 border-black pb-3 mb-4">
-        <h3 className="font-black uppercase text-sm flex items-center gap-2">
-            <BellRing className="w-4 h-4" /> Demandes
-        </h3>
-        <span className="bg-black text-white px-2 py-0.5 font-black text-xs">
-            {/* 👇 SÉCURITÉ ICI */}
-            {(stats.conges_attente || []).length}
-        </span>
-    </div>
+                    <div className="flex justify-between items-center border-b-4 border-black pb-3 mb-4">
+                        <h3 className="font-black uppercase text-sm flex items-center gap-2">
+                            <BellRing className="w-4 h-4" /> Demandes
+                        </h3>
+                        <span className="bg-black text-white px-2 py-0.5 font-black text-xs">
+                            {(stats.conges_attente || []).length}
+                        </span>
+                    </div>
 
-    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-        {/* 👇 SÉCURITÉ ICI */}
-        {(stats.conges_attente || []).length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <span className="text-3xl mb-2">🎉</span>
-                <p className="font-black text-xs uppercase text-gray-600">Aucune demande en attente.</p>
-            </div>
-        ) : (
-            (stats.conges_attente || []).map(conge => (
-                <div key={conge.id} className="bg-white border-2 border-black p-3 hover:-translate-y-1 transition-transform">
-                    <div className="mb-2">
-                        <span className="block font-black text-xs uppercase truncate" title={conge.employe_nom}>
-                            {conge.employe_nom}
-                        </span>
-                        <span className="text-[10px] font-bold text-gray-500">
-                            Du {new Date(conge.date_debut).toLocaleDateString()} au {new Date(conge.date_fin).toLocaleDateString()}
-                        </span>
-                    </div>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => handleUpdateConge(conge.id, 'APPROUVE')} 
-                            className="flex-1 bg-green-400 border-2 border-black text-[10px] font-black uppercase py-1 hover:bg-green-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none transition-all"
-                        >
-                            OUI
-                        </button>
-                        <button 
-                            onClick={() => handleUpdateConge(conge.id, 'REFUSE')} 
-                            className="flex-1 bg-red-500 text-white border-2 border-black text-[10px] font-black uppercase py-1 hover:bg-red-600 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none transition-all"
-                        >
-                            NON
-                        </button>
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        {(stats.conges_attente || []).length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                                <p className="font-black text-xs uppercase text-gray-600">Aucune demande en attente.</p>
+                            </div>
+                        ) : (
+                            (stats.conges_attente || []).map(conge => (
+                                <div key={conge.id} className="bg-white border-2 border-black p-3 hover:-translate-y-1 transition-transform">
+                                    <div className="mb-2">
+                                        <span className="block font-black text-xs uppercase truncate" title={conge.employe_nom}>
+                                            {conge.employe_nom}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-gray-500">
+                                            Du {new Date(conge.date_debut).toLocaleDateString()} au {new Date(conge.date_fin).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => handleUpdateConge(conge.id, 'APPROUVE')} 
+                                            className="flex-1 bg-green-400 border-2 border-black text-[10px] font-black uppercase py-1 hover:bg-green-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none transition-all"
+                                        >
+                                            OUI
+                                        </button>
+                                        <button 
+                                            onClick={() => handleUpdateConge(conge.id, 'REFUSE')} 
+                                            className="flex-1 bg-red-500 text-white border-2 border-black text-[10px] font-black uppercase py-1 hover:bg-red-600 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none transition-all"
+                                        >
+                                            NON
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
-            ))
-        )}
-    </div>
-</div>
-                </div>
             </div>
+        </div>
     );
 };
 
