@@ -71,7 +71,7 @@ const DashboardAdmin = ({ token, currentUser }) => {
             <div className="flex justify-between items-end border-b-4 border-black pb-4">
                 <div>
                     <h1 className="text-4xl font-black uppercase tracking-tighter">Tour de Contrôle</h1>
-                    <p className="font-bold text-gray-500 mt-1 uppercase tracking-widest text-xs">Vue Globale Smart Enterprise</p>
+                    <p className="font-bold text-gray-500 mt-1 uppercase tracking-widest text-xs">Vue Globale YT Solutions </p>
                 </div>
                 <div className="bg-purple-200 border-2 border-black px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hidden md:flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-purple-800" />

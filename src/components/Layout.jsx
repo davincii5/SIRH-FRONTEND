@@ -62,13 +62,12 @@ const Layout = ({ children, activeTab, setActiveTab, handleLogout, currentUser }
     return (
         <div className="h-screen w-full overflow-hidden bg-white flex flex-col font-sans selection:bg-yellow-300 selection:text-black">
             
-            <header className="border-b-4 border-black p-4 flex justify-between items-center bg-white z-10 shrink-0">
-                <div className="flex items-center gap-4">
+<header className="border-b-4 border-black p-4 flex justify-between items-center bg-white shrink-0">                <div className="flex items-center gap-4">
                     <span className="bg-black text-white px-3 py-1.5 font-black text-xl tracking-tighter shadow-[3px_3px_0px_0px_rgba(253,224,71,1)]">
                         SIRH
                     </span>
                     <h1 className="font-black text-xl tracking-tight hidden sm:block text-gray-900">
-                        Smart Enterprise
+                        YT Solutions
                     </h1>
                 </div>
                 

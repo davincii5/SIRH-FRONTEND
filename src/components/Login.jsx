@@ -114,7 +114,7 @@ const Login = ({ onLoginSuccess }) => {
                             SIRH
                         </h1>
                         <p className="text-sm font-black uppercase tracking-widest text-black mt-2 bg-white px-3 py-1 border-2 border-black inline-block shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                            Smart Enterprise
+                            YT Solutions
                         </p>
                     </div>
 
