@@ -1,37 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { CheckCircle2, XCircle } from 'lucide-react';
+
+// 👇 TOAST COMPONENT
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(() => onClose(), 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const styles = {
+        success: 'bg-green-400 border-black text-black',
+        error: 'bg-red-500 border-black text-white'
+    };
+
+    const icons = {
+        success: <CheckCircle2 className="w-5 h-5" />,
+        error: <XCircle className="w-5 h-5" />
+    };
+
+    return (
+        <div className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3 border-4 font-black text-sm uppercase tracking-wider shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] animate-in slide-in-from-right-full fade-in duration-300 ${styles[type]}`}>
+            {icons[type]}
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 font-black hover:scale-110 transition-transform">✕</button>
+        </div>
+    );
+};
 
 const Profile = ({ token, currentUser }) => {
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState(null); // 👈 Gestion du toast
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+    };
 
     useEffect(() => {
         axios.get('http://127.0.0.1:8000/api/accounts/employes/', {
             headers: { Authorization: `Bearer ${token}` }
         }).then(response => {
-            // On récupère les données de l'employé connecté
             const myData = response.data.find(emp => emp.username === currentUser.username);
             setProfileData(myData);
         }).catch(error => {
             console.error("Erreur chargement profil :", error);
+            showToast("Erreur lors du chargement du profil", 'error');
         }).finally(() => setLoading(false));
     }, [token, currentUser]);
 
-    // 👇 LA NOUVELLE FONCTION DE POINTAGE VIRTUEL 👇
     const handlePointageVirtuel = () => {
         axios.post('http://127.0.0.1:8000/api/payroll/pointage-virtuel/', {}, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(res => {
-            alert(res.data.message || "Pointage réussi !");
+            showToast(res.data.message || "Pointage réussi !", 'success');
         })
         .catch(err => {
             console.error(err);
-            alert("Erreur lors du pointage virtuel. L'API est-elle bien configurée ?");
+            const msg = err.response?.data?.error || err.response?.data?.detail || "Erreur lors du pointage virtuel. L'API est-elle bien configurée ?";
+            showToast(msg, 'error');
         });
     };
     
-    // Rendu pour l'Admin (qui n'a pas de profil d'employé)
     if (!profileData && !loading && (currentUser.role === 'ADMIN' || currentUser.role === 'ADMINISTRATEUR')) {
         return (
             <div className="max-w-3xl mx-auto bg-white border-4 border-black p-12 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-center">
@@ -51,7 +82,6 @@ const Profile = ({ token, currentUser }) => {
 
     if (!profileData) return <div className="text-center py-20 font-black text-red-500 uppercase">Erreur : Impossible de charger le profil.</div>;
 
-    // Formatage des compétences
     let competences = [];
     try {
         const rawData = typeof profileData.matrice_competences === 'string' 
@@ -72,8 +102,16 @@ const Profile = ({ token, currentUser }) => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
-            {/* --- EN-TÊTE DU PROFIL --- */}
+        <div className="max-w-4xl mx-auto bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative">
+            {/* 👇 TOAST RENDU */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
+
             <div className="border-b-4 border-black pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-6">
                     <img 
@@ -90,7 +128,6 @@ const Profile = ({ token, currentUser }) => {
                     </div>
                 </div>
 
-                {/* 👇 LE BOUTON EST PLACÉ ICI 👇 */}
                 <button 
                     onClick={handlePointageVirtuel}
                     className="bg-green-500 text-white font-black px-6 py-4 uppercase tracking-wider border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-green-400 active:translate-y-1 active:shadow-none transition-all"
@@ -100,7 +137,6 @@ const Profile = ({ token, currentUser }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                {/* --- INFOS PROFESSIONNELLES --- */}
                 <div className="space-y-6">
                     <div>
                         <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-2">Informations Générales</h3>
@@ -118,7 +154,6 @@ const Profile = ({ token, currentUser }) => {
                         </div>
                     </div>
 
-                    {/* --- CONTRAT (Lecture seule pour l'employé) --- */}
                     {profileData.contrat_actuel && (
                         <div>
                             <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-2">Détails du contrat</h3>
@@ -140,7 +175,6 @@ const Profile = ({ token, currentUser }) => {
                     )}
                 </div>
 
-                {/* --- MATRICE DE COMPÉTENCES --- */}
                 <div>
                     <h3 className="font-black text-sm uppercase tracking-widest text-blue-600 mb-4 border-b-4 border-black pb-2">
                         Mes Compétences (Matrice)

@@ -1,8 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { CheckCircle2, XCircle } from 'lucide-react';
+
+// 👇 TOAST COMPONENT
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(() => onClose(), 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const styles = {
+        success: 'bg-green-400 border-black text-black',
+        error: 'bg-red-500 border-black text-white'
+    };
+
+    const icons = {
+        success: <CheckCircle2 className="w-5 h-5" />,
+        error: <XCircle className="w-5 h-5" />
+    };
+
+    return (
+        <div className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3 border-4 font-black text-sm uppercase tracking-wider shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] animate-in slide-in-from-right-full fade-in duration-300 ${styles[type]}`}>
+            {icons[type]}
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 font-black hover:scale-110 transition-transform">✕</button>
+        </div>
+    );
+};
 
 const EmployeeLeave = ({ token, currentUser }) => {
     const [conges, setConges] = useState([]);
+    const [toast, setToast] = useState(null);
     const [formData, setFormData] = useState({
         type_conge: 'ANNUEL',
         date_debut: '',
@@ -10,38 +38,32 @@ const EmployeeLeave = ({ token, currentUser }) => {
         motif: ''
     });
 
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+    };
+
     const fetchConges = useCallback(() => {
         axios.get('http://127.0.0.1:8000/api/payroll/conges/', {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(res => {
-            // 👇 LE FILTRE MAGIQUE CORRIGÉ 👇
-            // On s'assure de comparer des chaînes ou des nombres de manière fiable.
-            // currentUser.id ou currentUser.user_id (selon ce que votre token JWT renvoie)
             const currentUserId = currentUser?.id || currentUser?.user_id;
-            
             const mesConges = res.data.filter(c => {
-                // Si l'API renvoie un ID directement (ex: c.employe = 5)
                 if (c.employe === currentUserId) return true;
-                
-                // Si l'API renvoie un objet imbriqué (ex: c.employe = { id: 5, username: '...' })
                 if (c.employe && typeof c.employe === 'object' && c.employe.id === currentUserId) return true;
-
-                // Comparaison de fallback sur le nom d'utilisateur au cas où
                 if (c.employe_nom === currentUser?.username) return true;
-                
                 return false;
             });
-            
             setConges(mesConges);
         })
-        .catch(err => console.error("Erreur lors du chargement des congés:", err));
+        .catch(err => {
+            console.error("Erreur lors du chargement des congés:", err);
+            showToast('Erreur de chargement des congés', 'error');
+        });
     }, [token, currentUser]);
 
     useEffect(() => {
-        if (currentUser) {
-            fetchConges();
-        }
+        if (currentUser) fetchConges();
     }, [fetchConges, currentUser]);
 
     const handleSubmit = (e) => {
@@ -52,15 +74,27 @@ const EmployeeLeave = ({ token, currentUser }) => {
             { headers: { Authorization: `Bearer ${token}` } }
         )
         .then(() => {
-            alert("✅ Demande envoyée avec succès !");
-            fetchConges(); // Recharge la liste immédiatement après l'ajout
+            showToast("Demande envoyée avec succès !", 'success');
+            fetchConges();
             setFormData({ type_conge: 'ANNUEL', date_debut: '', date_fin: '', motif: '' }); 
         })
-        .catch(err => alert("Erreur lors de l'envoi de la demande. Vérifiez que toutes les dates sont valides."));
+        .catch(err => {
+            const msg = err.response?.data?.detail || err.response?.data?.error || "Erreur lors de l'envoi. Vérifiez les dates.";
+            showToast(msg, 'error');
+        });
     };
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8 relative">
+            {/* 👇 TOAST RENDU */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
+
             {/* FORMULAIRE DE DEMANDE */}
             <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                 <h2 className="text-2xl font-black uppercase mb-4 italic">Nouvelle Demande de Congé</h2>

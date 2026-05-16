@@ -1,15 +1,54 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+
+// 👇 TOAST COMPONENT (intégré dans le même fichier)
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            onClose();
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const styles = {
+        success: 'bg-green-400 border-black text-black',
+        error: 'bg-red-500 border-black text-white',
+        warning: 'bg-yellow-300 border-black text-black'
+    };
+
+    const icons = {
+        success: <CheckCircle2 className="w-5 h-5" />,
+        error: <XCircle className="w-5 h-5" />,
+        warning: <AlertTriangle className="w-5 h-5" />
+    };
+
+    return (
+        <div className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3 border-4 font-black text-sm uppercase tracking-wider shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] animate-in slide-in-from-right-full fade-in duration-300 ${styles[type]}`}>
+            {icons[type]}
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 font-black hover:scale-110 transition-transform">✕</button>
+        </div>
+    );
+};
 
 const HRLeaveManagement = ({ token }) => {
     const [conges, setConges] = useState([]);
+    const [toast, setToast] = useState(null); // 👈 Gestion du toast
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+    };
 
     const fetchConges = useCallback(() => {
         axios.get('http://127.0.0.1:8000/api/payroll/conges/', {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(res => setConges(res.data))
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error(err);
+            showToast('Erreur de chargement des congés', 'error');
+        });
     }, [token]);
 
     useEffect(() => {
@@ -23,22 +62,32 @@ const HRLeaveManagement = ({ token }) => {
             { statut: nouveauStatut },
             { headers: { 
                 Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json' // Très important pour les PATCH
+                'Content-Type': 'application/json'
             } }
         )
         .then((res) => {
             console.log("Validation réussie :", res.data);
-            alert(`Congé ${nouveauStatut} avec succès !`);
-            fetchConges(); // On rafraîchit la liste pour voir le changement
+            showToast(`Congé ${nouveauStatut} avec succès !`, 'success');
+            fetchConges();
         })
         .catch(err => {
             console.error("Erreur complète :", err.response || err);
-            alert(`Erreur de validation: ${err.response?.data?.error || 'Vérifiez la console'}`);
+            const msg = err.response?.data?.error || err.response?.data?.statut?.[0] || 'Erreur de validation';
+            showToast(`Erreur: ${msg}`, 'error');
         });
     };
 
     return (
-        <div className="bg-white border-4 border-black p-6 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
+        <div className="bg-white border-4 border-black p-6 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative">
+            {/* 👇 RENDU DU TOAST */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
+
             <h2 className="text-3xl font-black uppercase mb-6 italic">Validation des Congés</h2>
             
             <div className="overflow-x-auto border-4 border-black">
